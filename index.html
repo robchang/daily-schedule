@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Daily Schedule</title>
+  <meta name="description" content="Today's plan, hour by hour, from 6 AM to 9 PM.">
+
+  <!-- Link preview (iMessage, Slack, etc. read Open Graph tags) -->
+  <meta property="og:type" content="website">
+  <meta property="og:site_name" content="Daily Schedule">
+  <meta property="og:title" content="Daily Schedule">
+  <meta property="og:description" content="Today's plan, hour by hour, from 6 AM to 9 PM.">
+  <meta property="og:url" content="https://robchang.github.io/daily-schedule/">
+  <meta property="og:image" content="https://robchang.github.io/daily-schedule/preview.png">
+  <meta property="og:image:secure_url" content="https://robchang.github.io/daily-schedule/preview.png">
+  <meta property="og:image:type" content="image/png">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta property="og:image:alt" content="Daily schedule card showing the day's hours">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="Daily Schedule">
+  <meta name="twitter:description" content="Today's plan, hour by hour, from 6 AM to 9 PM.">
+  <meta name="twitter:image" content="https://robchang.github.io/daily-schedule/preview.png">
+
+  <!-- iOS home screen / icon -->
+  <link rel="apple-touch-icon" href="https://robchang.github.io/daily-schedule/apple-touch-icon.png">
+  <meta name="apple-mobile-web-app-title" content="Schedule">
+  <meta name="theme-color" content="#0f172a">
+
+  <style>
+    :root { --bg:#f8fafc; --card:#fff; --text:#0f172a; --muted:#64748b; --line:#e2e8f0; --accent:#2563eb; --now:#dc2626; }
+    @media (prefers-color-scheme: dark) {
+      :root { --bg:#0b1120; --card:#111827; --text:#f1f5f9; --muted:#94a3b8; --line:#1f2937; --accent:#60a5fa; --now:#f87171; }
+    }
+    * { box-sizing: border-box; }
+    body { margin:0; background:var(--bg); color:var(--text);
+      font-family:-apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", Roboto, sans-serif; }
+    main { max-width:640px; margin:0 auto; padding:24px 16px calc(32px + env(safe-area-inset-bottom)); }
+    h1 { font-size:28px; margin:0 0 4px; }
+    .date { color:var(--muted); margin:0 0 20px; }
+    .day { background:var(--card); border:1px solid var(--line); border-radius:16px; overflow:hidden; }
+    .row { display:flex; gap:12px; min-height:64px; border-top:1px solid var(--line); position:relative; }
+    .row:first-child { border-top:0; }
+    .hour { width:64px; flex:none; padding:12px 0 0 14px; font-size:13px; color:var(--muted); font-variant-numeric:tabular-nums; }
+    .slot { flex:1; padding:8px 12px 8px 0; display:flex; flex-direction:column; gap:6px; }
+    .event { border-left:4px solid var(--c, var(--accent)); background:color-mix(in srgb, var(--c, var(--accent)) 12%, transparent);
+      border-radius:8px; padding:8px 10px; }
+    .event b { display:block; font-size:15px; }
+    .event span { font-size:13px; color:var(--muted); }
+    .row.current .hour { color:var(--now); font-weight:600; }
+    .nowline { position:absolute; left:0; right:0; height:2px; background:var(--now); z-index:2; }
+    .nowline::before { content:""; position:absolute; left:58px; top:-4px; width:10px; height:10px; border-radius:50%; background:var(--now); }
+    footer { color:var(--muted); font-size:12px; text-align:center; margin-top:16px; }
+  </style>
+</head>
+<body>
+  <main>
+    <h1>Daily Schedule</h1>
+    <p class="date" id="date"></p>
+    <div class="day" id="day"></div>
+    <footer>Sample schedule. Edit the events list in the page source.</footer>
+  </main>
+
+  <script>
+    // Sample events: hour is 24h start, len in hours. Edit freely.
+    const events = [
+      { hour: 6,  title: "Morning walk",           note: "30 min, around the block", c: "#16a34a" },
+      { hour: 7,  title: "Breakfast & email",      note: "Inbox to zero" },
+      { hour: 8,  title: "Deep work",              note: "Top priority project", c: "#7c3aed" },
+      { hour: 10, title: "Team check-in",          note: "Video call, 30 min", c: "#ea580c" },
+      { hour: 11, title: "Errands",                note: "Post office, hardware store" },
+      { hour: 12, title: "Lunch",                  note: "", c: "#16a34a" },
+      { hour: 13, title: "Customer calls",         note: "Follow-ups from last week", c: "#ea580c" },
+      { hour: 15, title: "Admin & invoices",       note: "" },
+      { hour: 16, title: "Field / garden time",    note: "", c: "#16a34a" },
+      { hour: 18, title: "Dinner",                 note: "" },
+      { hour: 20, title: "Plan tomorrow",          note: "15 min review", c: "#7c3aed" },
+    ];
+    const START = 6, END = 21;
+    const fmt = h => { const s = h < 12 ? "AM" : "PM"; const x = h % 12 || 12; return x + " " + s; };
+    const esc = s => s.replace(/[&<>"]/g, ch => ({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;" }[ch]));
+
+    const now = new Date();
+    document.getElementById("date").textContent =
+      now.toLocaleDateString(undefined, { weekday: "long", month: "long", day: "numeric" });
+
+    const day = document.getElementById("day");
+    for (let h = START; h <= END; h++) {
+      const row = document.createElement("div");
+      row.className = "row" + (now.getHours() === h ? " current" : "");
+      const evs = events.filter(e => e.hour === h).map(e =>
+        `<div class="event" style="${e.c ? "--c:" + e.c : ""}"><b>${esc(e.title)}</b>${e.note ? `<span>${esc(e.note)}</span>` : ""}</div>`
+      ).join("");
+      row.innerHTML = `<div class="hour">${fmt(h)}</div><div class="slot">${evs}</div>`;
+      if (now.getHours() === h) {
+        const line = document.createElement("div");
+        line.className = "nowline";
+        line.style.top = (now.getMinutes() / 60 * 100) + "%";
+        row.appendChild(line);
+      }
+      day.appendChild(row);
+    }
+    const cur = day.querySelector(".current");
+    if (cur) cur.scrollIntoView({ block: "center" });
+  </script>
+</body>
+</html>
